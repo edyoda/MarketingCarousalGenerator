@@ -22,7 +22,7 @@ from app.graph.graph import get_app
 from app.graph.state import initial_state
 from app.llm import describe
 from app.rendering.design_system import MODERN_THEMES, SKETCH_THEMES
-from app.observability import NODE_LABELS, configure_logging
+from app.observability import NODE_LABELS, configure_logging, run_config, tracing_status
 from app.tools.web_search import active_backend
 
 configure_logging(logging.INFO)
@@ -61,10 +61,12 @@ def _init_session() -> None:
 
 
 def _config() -> dict:
-    return {
-        "configurable": {"thread_id": st.session_state.thread_id},
-        "recursion_limit": RECURSION_LIMIT,
-    }
+    """Run config, including any tracer callbacks and the run's tags."""
+    return run_config(
+        st.session_state.thread_id,
+        st.session_state.get("run_meta", {}),
+        recursion_limit=RECURSION_LIMIT,
+    )
 
 
 def _render_progress(container) -> None:
@@ -169,6 +171,7 @@ with st.sidebar:
     st.caption(f"**Model:** {describe()}")
     st.caption(f"**Search:** {active_backend()}")
     st.caption(f"**Thread:** `{st.session_state.thread_id}`")
+    st.caption(f"**Tracing:** {tracing_status()}")
 
     start = st.button("Generate carousel", type="primary", use_container_width=True)
     if st.button("New session", use_container_width=True):
@@ -202,6 +205,14 @@ if start:
         domain, audience, platform, slide_count, st.session_state.thread_id,
         slide_style=style,
     )
+    # Remembered so that resumes after an interrupt tag the trace identically.
+    st.session_state.run_meta = {
+        "domain": domain,
+        "audience": audience,
+        "platform": platform,
+        "slide_count": slide_count,
+        "slide_style": style,
+    }
     if theme != "auto":
         state["design_theme"] = theme
 

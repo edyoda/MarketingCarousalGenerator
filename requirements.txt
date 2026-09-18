@@ -23,3 +23,12 @@ streamlit>=1.38
 
 # --- developer conveniences ------------------------------------------------
 grandalf>=0.8             # ASCII graph diagrams for `--show-graph`
+
+# --- optional: hosted tracing ----------------------------------------------
+# LangSmith needs NO package - it activates from environment variables alone
+# (langsmith ships as a langchain-core dependency).
+#
+# Langfuse needs both of these; install only if you set LANGFUSE_* keys:
+#   pip install langfuse langchain
+# The `langchain` umbrella package is required by Langfuse's LangChain
+# integration - langchain-core on its own is not enough.

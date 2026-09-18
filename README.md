@@ -511,11 +511,58 @@ in-process bus that the Streamlit progress checklist subscribes to.
 19:48:17 | INFO | node.generate_slide  | DONE  Generating slides | 5306ms | output={"slides": "list[1]"}
 ```
 
-To add a hosted tracer, no node code changes:
+### Hosted tracing
 
-* **LangSmith** — set `LANGCHAIN_TRACING_V2=true` and `LANGCHAIN_API_KEY`.
-* **Langfuse** — set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`;
-  `observability.get_callbacks()` picks it up.
+Both are optional and off by default. With neither configured you get the local
+logs above and nothing else. The CLI banner and the UI sidebar both print which
+tracers are active, so you can tell at a glance whether it is working:
+
+```
+Tracing   : LangSmith (carousel-class)
+```
+
+**LangSmith** needs no code and no callback — LangChain auto-instruments itself
+from environment variables:
+
+```bash
+LANGSMITH_TRACING=true          # LANGCHAIN_TRACING_V2=true also works
+LANGSMITH_API_KEY=lsv2_...
+LANGSMITH_PROJECT=trend-to-carousel
+```
+
+**Langfuse** works differently: it needs a `CallbackHandler` attached to every
+run. `app/observability.py` builds it and `run_config()` attaches it.
+
+```bash
+pip install langfuse langchain      # note: langchain, not just langchain-core
+```
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+> The `langchain` umbrella package is a real requirement for Langfuse's
+> LangChain integration — `langchain-core` alone raises `ModuleNotFoundError`
+> from inside Langfuse. If the keys are set but a package is missing, the app
+> logs a warning naming the fix and keeps running untraced.
+
+### What makes the traces usable
+
+`run_config()` in `app/observability.py` is the single place a run is described
+to the outside world. It attaches a run name, tags and metadata:
+
+```python
+run_name: "carousel:AI"
+tags:     ["trend-to-carousel", "domain:AI", "platform:LinkedIn", "style:sketch"]
+metadata: {"thread_id": ..., "audience": ..., "slide_count": 5, ...}
+```
+
+Without those, a hosted trace is a wall of identically-named runs. With them you
+can filter to "every sketch-style LinkedIn run for developers" and compare.
+
+Because the config is built in one place, **the CLI and the UI trace
+identically**, and a run resumed after a human approval keeps the same tags.
 
 ---
 

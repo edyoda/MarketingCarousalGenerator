@@ -198,16 +198,129 @@ def traced_node(fn: Callable) -> Callable:
     return wrapper
 
 
-def get_callbacks() -> list:
-    """Optional tracer callbacks (Langfuse). LangSmith needs no callback."""
-    callbacks: list = []
+# ---------------------------------------------------------------------------
+# Hosted tracing: LangSmith and Langfuse
+# ---------------------------------------------------------------------------
+# The two integrate in genuinely different ways, which is worth knowing:
+#
+#   LangSmith  auto-instruments LangChain globally from environment variables.
+#              No callback object, no code. Set LANGSMITH_TRACING=true (or the
+#              older LANGCHAIN_TRACING_V2=true) plus LANGSMITH_API_KEY.
+#
+#   Langfuse   needs a CallbackHandler passed into each run's config. That is
+#              what `get_callbacks()` builds and `run_config()` attaches.
+#
+# Neither is required. With no variables set, both helpers no-op and the local
+# @traced_node logging is all you get.
+
+
+def langsmith_enabled() -> bool:
+    """True when LangChain's global LangSmith tracing is switched on."""
+    import os
+
+    return os.getenv("LANGSMITH_TRACING", "").lower() == "true" or \
+        os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true"
+
+
+def _langfuse_handler():
+    """Build a Langfuse CallbackHandler, or return None with a clear reason.
+
+    The import path moved between major versions, so both are tried:
+      langfuse >= 3   ->  langfuse.langchain.CallbackHandler
+      langfuse 2.x    ->  langfuse.callback.CallbackHandler
+
+    Credentials are read by Langfuse itself from LANGFUSE_PUBLIC_KEY /
+    LANGFUSE_SECRET_KEY / LANGFUSE_HOST - we never pass them explicitly.
+    """
+    import os
+
+    logger = logging.getLogger(__name__)
+
+    if not (os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY")):
+        return None
+
+    handler_cls = None
+    for module_path in ("langfuse.langchain", "langfuse.callback"):
+        try:
+            module = __import__(module_path, fromlist=["CallbackHandler"])
+            handler_cls = module.CallbackHandler
+            break
+        except ImportError as exc:
+            # langfuse>=3 raises ImportError from its own module when the
+            # `langchain` umbrella package is missing - surface that, because
+            # langchain-core alone is not enough for this integration.
+            if "langchain" in str(exc).lower() and "langfuse" not in str(exc).lower():
+                logger.warning(
+                    "Langfuse keys are set but its LangChain integration needs the "
+                    "`langchain` package: pip install langchain"
+                )
+                return None
+
+    if handler_cls is None:
+        logger.warning(
+            "Langfuse keys are set but the package is not installed: pip install langfuse langchain"
+        )
+        return None
+
     try:
+        return handler_cls()
+    except Exception as exc:
+        logger.warning("Langfuse handler could not be created: %s", exc)
+        return None
+
+
+def get_callbacks() -> list:
+    """Tracer callbacks to attach to a run. Empty when nothing is configured."""
+    handler = _langfuse_handler()
+    return [handler] if handler else []
+
+
+def tracing_status() -> str:
+    """One-line description of which tracers are active, for the CLI and UI."""
+    active = []
+    if langsmith_enabled():
         import os
 
-        if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
-            from langfuse.callback import CallbackHandler
+        project = os.getenv("LANGSMITH_PROJECT") or os.getenv("LANGCHAIN_PROJECT") or "default"
+        active.append(f"LangSmith ({project})")
+    if get_callbacks():
+        active.append("Langfuse")
+    return ", ".join(active) if active else "local logs only"
 
-            callbacks.append(CallbackHandler())
-    except Exception:
-        logging.getLogger(__name__).debug("Langfuse not configured", exc_info=True)
-    return callbacks
+
+def run_config(
+    thread_id: str,
+    state: dict | None = None,
+    recursion_limit: int = 60,
+) -> dict:
+    """Build the config passed to every graph invocation.
+
+    This is the single place a run is described to the outside world. Attaching
+    `tags` and `metadata` is what makes a hosted trace searchable - without them
+    you get a wall of identical-looking runs.
+    """
+    state = state or {}
+    config: dict = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": recursion_limit,
+        "run_name": f"carousel:{state.get('domain', 'unknown')}",
+        "tags": [
+            "trend-to-carousel",
+            f"domain:{state.get('domain', 'unknown')}",
+            f"platform:{state.get('platform', 'unknown')}",
+            f"style:{state.get('slide_style') or 'modern'}",
+        ],
+        "metadata": {
+            "thread_id": thread_id,
+            "domain": state.get("domain"),
+            "audience": state.get("audience"),
+            "platform": state.get("platform"),
+            "slide_count": state.get("slide_count"),
+            "slide_style": state.get("slide_style") or "modern",
+        },
+    }
+
+    callbacks = get_callbacks()
+    if callbacks:
+        config["callbacks"] = callbacks
+    return config

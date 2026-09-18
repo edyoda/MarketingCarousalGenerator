@@ -20,7 +20,7 @@ from app.config import settings
 from app.graph.graph import get_app, save_diagram
 from app.graph.state import initial_state
 from app.llm import describe
-from app.observability import NODE_LABELS, configure_logging
+from app.observability import NODE_LABELS, configure_logging, run_config, tracing_status
 from app.tools.web_search import active_backend
 
 logger = logging.getLogger(__name__)
@@ -112,10 +112,20 @@ def run(args: argparse.Namespace) -> dict:
     settings.require_image_approval = args.approve_images or settings.require_image_approval
 
     thread_id = args.thread_id or f"carousel-{datetime.now():%Y%m%d-%H%M%S}"
-    config = {
-        "configurable": {"thread_id": thread_id},
-        "recursion_limit": RECURSION_LIMIT,
-    }
+
+    # The config carries the tracer callbacks as well as the thread id. Building
+    # it in one place is what stopped Langfuse from silently receiving nothing.
+    config = run_config(
+        thread_id,
+        {
+            "domain": args.domain,
+            "audience": args.audience,
+            "platform": args.platform,
+            "slide_count": args.slides,
+            "slide_style": args.style or settings.slide_style,
+        },
+        recursion_limit=RECURSION_LIMIT,
+    )
 
     app = get_app()
 
@@ -129,6 +139,7 @@ def run(args: argparse.Namespace) -> dict:
     print(f"  Style     : {args.style or settings.slide_style}")
     print(f"  Model     : {describe()}")
     print(f"  Search    : {active_backend()}")
+    print(f"  Tracing   : {tracing_status()}")
     print(f"  Thread id : {thread_id}")
     print("=" * 68 + "\n")
 
