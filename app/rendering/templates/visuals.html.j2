@@ -1,0 +1,168 @@
+{# ---------------------------------------------------------------------------
+   One macro per visual_type. The LLM picks the type, the renderer picks the
+   macro. Adding a new visual type = adding a macro here plus a name in the
+   VisualType Literal in app/models/slide.py.
+   `items` is the slide's visual_elements list.
+--------------------------------------------------------------------------- #}
+
+{% macro flow(items) %}
+  <div class="flow">
+    {% for item in items[:4] %}
+      <div class="flow-node {% if loop.last %}flow-node--accent{% endif %}">{{ item }}</div>
+      {% if not loop.last %}<div class="flow-arrow">&rarr;</div>{% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro architecture(items) %}
+  <div class="arch">
+    {% for item in items[:4] %}
+      <div class="arch-layer {% if loop.index0 == 1 %}arch-layer--accent{% endif %}">
+        <span class="arch-index">{{ '%02d' % loop.index }}</span>
+        <span class="arch-label">{{ item }}</span>
+      </div>
+      {% if not loop.last %}<div class="arch-connector"></div>{% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro process(items) %}
+  <ol class="process">
+    {% for item in items[:4] %}
+      <li class="process-step">
+        <span class="process-num">{{ loop.index }}</span>
+        <span class="process-text">{{ item }}</span>
+      </li>
+    {% endfor %}
+  </ol>
+{% endmacro %}
+
+{% macro comparison(items) %}
+  <div class="compare">
+    {% for item in items[:2] %}
+      <div class="compare-card {% if loop.last %}compare-card--accent{% endif %}">
+        {% set parts = item.split(':', 1) %}
+        {% if parts|length == 2 %}
+          <div class="compare-label">{{ parts[0] }}</div>
+          <div class="compare-value">{{ parts[1] | trim }}</div>
+        {% else %}
+          <div class="compare-value">{{ item }}</div>
+        {% endif %}
+      </div>
+      {% if not loop.last %}<div class="compare-vs">vs</div>{% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro before_after(items) %}
+  <div class="ba">
+    {% for item in items[:2] %}
+      {% set parts = item.split(':', 1) %}
+      <div class="ba-card {% if loop.last %}ba-card--after{% else %}ba-card--before{% endif %}">
+        <div class="ba-tag">{{ parts[0] if parts|length == 2 else ('Before' if loop.first else 'After') }}</div>
+        <div class="ba-text">{{ parts[1] | trim if parts|length == 2 else item }}</div>
+      </div>
+      {% if not loop.last %}<div class="ba-arrow">&rarr;</div>{% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro card_grid(items) %}
+  <div class="cards cards--{{ items[:4]|length }}">
+    {% for item in items[:4] %}
+      <div class="card">
+        <div class="card-dot"></div>
+        <div class="card-text">{{ item }}</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro timeline(items) %}
+  <div class="timeline">
+    {% for item in items[:4] %}
+      {% set parts = item.split('-', 1) %}
+      <div class="tl-row">
+        <div class="tl-marker {% if loop.last %}tl-marker--accent{% endif %}"></div>
+        <div class="tl-body">
+          {% if parts|length == 2 %}
+            <div class="tl-when">{{ parts[0] | trim }}</div>
+            <div class="tl-what">{{ parts[1] | trim }}</div>
+          {% else %}
+            <div class="tl-what">{{ item }}</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro statistic(items, highlight) %}
+  {# The number is the hero. Pick the first label that is NOT just a restatement
+     of that number as the caption, so the slide never reads "42% / 2026: 42%". #}
+  {% set number = highlight or (items[0] if items else '') %}
+  {% set ns = namespace(caption='') %}
+  {% for item in items %}
+    {% if not ns.caption and number and number|lower not in item|lower %}
+      {% set ns.caption = item %}
+    {% endif %}
+  {% endfor %}
+  <div class="stat">
+    <div class="stat-number">{{ number }}</div>
+    {% if ns.caption %}<div class="stat-caption">{{ ns.caption }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro quote(items, body) %}
+  <div class="quote">
+    <div class="quote-mark">&ldquo;</div>
+    <div class="quote-text">{{ items[0] if items else body }}</div>
+    {% if items|length > 1 %}<div class="quote-attr">&mdash; {{ items[1] }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro cta(items, cta_text) %}
+  <div class="cta">
+    {% if items %}
+      <div class="cta-points">
+        {% for item in items[:3] %}
+          <div class="cta-point"><span class="cta-check">&check;</span>{{ item }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if cta_text %}<div class="cta-banner">{{ cta_text }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro diagram(items) %}
+  <div class="diagram">
+    {% for item in items[:3] %}
+      <div class="diagram-chip {% if loop.first %}diagram-chip--accent{% endif %}">{{ item }}</div>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro hook(items) %}
+  {% if items %}
+    <div class="hook-tags">
+      {% for item in items[:3] %}<span class="hook-tag">{{ item }}</span>{% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{# Dispatcher: maps visual_type -> macro. #}
+{% macro render(visual_type, items, highlight, body, cta_text) %}
+  {% if   visual_type == 'FLOW'         %}{{ flow(items) }}
+  {% elif visual_type == 'ARCHITECTURE' %}{{ architecture(items) }}
+  {% elif visual_type == 'PROCESS'      %}{{ process(items) }}
+  {% elif visual_type == 'COMPARISON'   %}{{ comparison(items) }}
+  {% elif visual_type == 'BEFORE_AFTER' %}{{ before_after(items) }}
+  {% elif visual_type == 'CARD_GRID'    %}{{ card_grid(items) }}
+  {% elif visual_type == 'TIMELINE'     %}{{ timeline(items) }}
+  {% elif visual_type == 'STATISTIC'    %}{{ statistic(items, highlight) }}
+  {% elif visual_type == 'QUOTE'        %}{{ quote(items, body) }}
+  {% elif visual_type == 'CTA'          %}{{ cta(items, cta_text) }}
+  {% elif visual_type == 'HOOK'         %}{{ hook(items) }}
+  {% else %}{{ diagram(items) }}
+  {% endif %}
+{% endmacro %}

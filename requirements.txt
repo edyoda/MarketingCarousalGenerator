@@ -1,0 +1,25 @@
+# --- LangGraph / LangChain -------------------------------------------------
+langgraph>=1.2,<2
+langgraph-checkpoint-sqlite>=3.1
+langchain-core>=1.0
+langchain-anthropic>=1.0
+langchain-openai>=1.0
+
+# --- data modelling --------------------------------------------------------
+pydantic>=2.9
+python-dotenv>=1.0
+
+# --- web research ----------------------------------------------------------
+ddgs>=9.0                 # keyless DuckDuckGo search (default backend)
+tavily-python>=0.8        # optional, better results, needs TAVILY_API_KEY
+
+# --- rendering (Slide JSON -> HTML -> PNG) ---------------------------------
+jinja2>=3.1
+playwright>=1.48          # run `playwright install chromium` after installing
+pillow>=10.0              # fallback renderer when no browser is available
+
+# --- UI --------------------------------------------------------------------
+streamlit>=1.38
+
+# --- developer conveniences ------------------------------------------------
+grandalf>=0.8             # ASCII graph diagrams for `--show-graph`

@@ -1,0 +1,53 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	trend_research(trend_research)
+	trend_analyzer(trend_analyzer)
+	topic_selection(topic_selection)
+	human_topic_approval(human_topic_approval)
+	research_topic(research_topic)
+	content_strategy(content_strategy)
+	carousel_planner(carousel_planner)
+	generate_slide(generate_slide)
+	merge_slides(merge_slides)
+	carousel_critic(carousel_critic)
+	prepare_rewrite(prepare_rewrite)
+	rewrite_slide(rewrite_slide)
+	flag_quality(flag_quality)
+	human_image_approval(human_image_approval)
+	render_images(render_images)
+	image_quality_check(image_quality_check)
+	finalize(finalize)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> trend_research;
+	carousel_critic -. &nbsp;give_up&nbsp; .-> flag_quality;
+	carousel_critic -. &nbsp;approved&nbsp; .-> human_image_approval;
+	carousel_critic -. &nbsp;rewrite&nbsp; .-> prepare_rewrite;
+	carousel_planner -.-> generate_slide;
+	carousel_planner -.-> merge_slides;
+	content_strategy --> carousel_planner;
+	flag_quality --> human_image_approval;
+	generate_slide --> merge_slides;
+	human_image_approval -.-> finalize;
+	human_image_approval -.-> render_images;
+	human_topic_approval -.-> research_topic;
+	human_topic_approval -.-> topic_selection;
+	image_quality_check -.-> finalize;
+	image_quality_check -.-> render_images;
+	merge_slides --> carousel_critic;
+	prepare_rewrite -.-> carousel_critic;
+	prepare_rewrite -.-> rewrite_slide;
+	render_images --> image_quality_check;
+	research_topic --> content_strategy;
+	rewrite_slide --> carousel_critic;
+	topic_selection --> human_topic_approval;
+	trend_analyzer --> topic_selection;
+	trend_research --> trend_analyzer;
+	finalize --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
