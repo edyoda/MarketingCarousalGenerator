@@ -539,8 +539,20 @@ pip install langfuse langchain      # note: langchain, not just langchain-core
 ```bash
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=https://cloud.langfuse.com
+LANGFUSE_BASE_URL=https://us.cloud.langfuse.com   # or eu.cloud.langfuse.com
 ```
+
+> The host variable is `LANGFUSE_BASE_URL` on langfuse >= 3. Version 2 used
+> `LANGFUSE_HOST`, which v4 ignores — set the wrong one and the SDK silently
+> falls back to its default region.
+
+Once configured, Langfuse also gives you **token counts and cost per call** with
+no extra work — each LLM generation in the trace carries its usage and a
+computed dollar cost, which is the cheapest way to see what a prompt change
+actually costs.
+
+Note that ingestion is not instant: a trace typically appears in the UI within
+about 30 seconds of the run finishing.
 
 > The `langchain` umbrella package is a real requirement for Langfuse's
 > LangChain integration — `langchain-core` alone raises `ModuleNotFoundError`
