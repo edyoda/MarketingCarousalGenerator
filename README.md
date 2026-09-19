@@ -526,8 +526,17 @@ from environment variables:
 
 ```bash
 LANGSMITH_TRACING=true          # LANGCHAIN_TRACING_V2=true also works
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com   # eu.api.smith... for the EU region
 LANGSMITH_API_KEY=lsv2_...
 LANGSMITH_PROJECT=trend-to-carousel
+```
+
+A LangSmith trace nests the way the graph runs, with token counts at each level:
+
+```
+carousel:AI            chain   24 tokens
+  probe_node           chain   24 tokens
+    ChatAnthropic      llm     24 tokens
 ```
 
 **Langfuse** works differently: it needs a `CallbackHandler` attached to every
@@ -575,6 +584,14 @@ can filter to "every sketch-style LinkedIn run for developers" and compare.
 
 Because the config is built in one place, **the CLI and the UI trace
 identically**, and a run resumed after a human approval keeps the same tags.
+
+**Both tracers can run at once.** They use independent mechanisms — LangSmith
+auto-instruments globally, Langfuse rides on the callback — so enabling both
+sends every run to both, and `tracing_status()` reports it:
+
+```
+Tracing   : LangSmith (AIContent), Langfuse
+```
 
 ---
 
