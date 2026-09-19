@@ -113,9 +113,23 @@ python -m app.main --show-graph
 streamlit run streamlit_app.py
 ```
 
-Four inputs, a live progress checklist driven by the graph's own node events,
-approval buttons when an interrupt fires, and the finished carousel with a
-`.zip` download.
+Four inputs in the sidebar, a live progress checklist driven by the graph's own
+node events, approval buttons when an interrupt fires, and downloads when the
+run completes.
+
+| Element | Behaviour |
+|---|---|
+| **Pause for topic approval** | **On by default.** The run stops after topic selection and waits for you. |
+| **Approve** / **Reject, find another** | Resume the graph with `Command(resume=…)`. Reject loops back and picks a different topic. |
+| Alternatives dropdown | Swap in any other trend the research turned up. |
+| **Pause before rendering** | Off by default. A second gate to review slide copy before the PNGs are made. |
+| Visual style · Colour theme | `modern` or `sketch`; the theme list follows the chosen style. |
+| ⬇ Slide *n* | Download one PNG. |
+| ⬇ Download all (.zip) | All slides plus `carousel.json`. |
+| Sidebar captions | Which model, which search backend, and **which tracers are live**. |
+
+The topic gate is on by default on purpose: it sits *before* the expensive deep
+research, so approving costs nothing and rejecting saves the whole pipeline.
 
 ---
 
@@ -298,6 +312,7 @@ choice makes both the fan-out and the loop correct:
 | **Human-in-the-loop** | `interrupt()` in `nodes/trends.py` and `nodes/images.py`; resumed with `Command(resume=…)` in `main.py` |
 | **Persistence** | `graph.py:make_checkpointer()` — `SqliteSaver`, keyed by `thread_id` |
 | **Observability** | `app/observability.py:traced_node` wraps every node |
+| **Hosted tracing** | `app/observability.py:run_config()` — builds each run's config and attaches the tracer callbacks |
 
 ### Persistence in practice
 
@@ -488,6 +503,11 @@ Everything is optional except one API key. Full list in `.env.example`.
 | `RENDERER` | `auto` | `playwright` \| `pillow` |
 | `SLIDE_STYLE` | `modern` | `modern` \| `sketch` (hand-drawn) |
 | `CHECKPOINT_DB` | `./checkpoints.sqlite` | Where runs are persisted |
+| `LANGSMITH_TRACING` | unset | `true` switches LangSmith on (no package needed) |
+| `LANGSMITH_ENDPOINT` | US region | Set to `https://eu.api.smith.langchain.com` for the EU |
+| `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | unset | LangSmith credentials and project name |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | unset | Langfuse credentials (needs `pip install langfuse langchain`) |
+| `LANGFUSE_BASE_URL` | Langfuse default | e.g. `https://us.cloud.langfuse.com`. **Not** `LANGFUSE_HOST` on v3+ |
 
 > **Note on `LLM_TEMPERATURE`:** current Claude models removed the sampling
 > parameters, so `app/llm.py` omits `temperature` for them and passes it for
@@ -606,6 +626,11 @@ Tracing   : LangSmith (AIContent), Langfuse
 | Fonts look generic | Inter is fetched from Google Fonts at render time; offline runs fall back to Noto/DejaVu |
 | `recursion limit` reached | Lower `MAX_REVISIONS`, or raise `RECURSION_LIMIT` in `app/main.py` |
 | Resume starts over | The `thread_id` must match exactly; list runs with `sqlite3 checkpoints.sqlite "select distinct thread_id from checkpoints"` |
+| Tracing configured but no traces appear | Check the banner: it prints `Tracing: …`. If it says `local logs only`, the variables were not picked up |
+| Langfuse traces missing, no error | You probably set `LANGFUSE_HOST`. v3+ reads `LANGFUSE_BASE_URL`; the old name is ignored silently |
+| Langfuse logs "needs the `langchain` package" | `pip install langchain` — `langchain-core` alone is not enough for its integration |
+| Trace does not show immediately | Langfuse ingestion takes roughly 30 seconds; LangSmith is quicker but not instant |
+| App fails with a 401 on every LLM call | Check `.env` for a placeholder like `ANTHROPIC_API_KEY=<your-key>` — it overrides `ANTHROPIC_KEY` |
 
 ---
 
@@ -635,3 +660,4 @@ API key and no network needed. They run in about 1.5 seconds.
 | Reject → re-select | Rejecting recorded the topic in `rejected_topics` and the graph proposed a genuinely different one |
 | Real images | 5 files at exactly 1080×1350, verified by `image_quality_check` |
 | Search failure tolerance | A backend returning TLS errors mid-run logged a warning and the graph completed |
+| Hosted tracing | A run sent to live LangSmith and Langfuse projects simultaneously; both showed the nested graph → node → LLM spans with token counts |
